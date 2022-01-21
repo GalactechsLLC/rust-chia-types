@@ -1,7 +1,7 @@
-use serde::{Serialize, Deserialize};
-use hex::{encode, decode};
+use hex::{decode, encode};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::error::Error;
-use sha2::{Sha256, Digest};
 //#[serde(deserialize_with = "crate::")]
 
 pub fn u64_to_bytes(v: u64) -> Vec<u8> {
@@ -66,20 +66,18 @@ pub struct BlockRecord {
     pub infused_challenge_vdf_output: Option<VdfOutput>,
     pub overflow: bool,
     pub reward_claims_incorporated: Option<Vec<Coin>>,
-    pub sub_epoch_summary_included: Option<SubEpochSummary>
+    pub sub_epoch_summary_included: Option<SubEpochSummary>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Coin {
     pub amount: u64,
     pub parent_coin_info: String,
-    pub puzzle_hash: String
+    pub puzzle_hash: String,
 }
 impl Coin {
     pub async fn name(&self) -> Result<String, Box<dyn Error>> {
-        Ok(
-            encode(self.hash().await.unwrap())
-        )
+        Ok(encode(self.hash().await.unwrap()))
     }
 
     fn prep_hex_str(&self, to_fix: &String) -> String {
@@ -99,9 +97,7 @@ impl Coin {
         to_hash.extend(u64_to_bytes(self.amount));
         let mut hasher: Sha256 = Sha256::new();
         hasher.update(to_hash);
-        Ok(
-            hasher.finalize().to_vec()
-        )
+        Ok(hasher.finalize().to_vec())
     }
 }
 
@@ -112,14 +108,14 @@ pub struct CoinRecord {
     pub spent_block_index: u32,
     pub timestamp: u64,
     pub coinbase: bool,
-    pub spent: bool
+    pub spent: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CoinSpend {
     pub coin: Coin,
     pub puzzle_reveal: String,
-    pub solution: String
+    pub solution: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -127,7 +123,7 @@ pub struct ChallengeBlockInfo {
     pub proof_of_space: ProofOfSpace,
     pub challenge_chain_sp_vdf: Option<VdfInfo>,
     pub challenge_chain_sp_signature: String,
-    pub challenge_chain_ip_vdf: VdfInfo
+    pub challenge_chain_ip_vdf: VdfInfo,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -136,7 +132,7 @@ pub struct ChallengeChainSubSlot {
     pub new_sub_slot_iters: Option<u64>,
     pub new_difficulty: Option<u64>,
     pub infused_challenge_chain_sub_slot_hash: Option<String>,
-    pub subepoch_summary_hash: Option<String>
+    pub subepoch_summary_hash: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -146,7 +142,7 @@ pub struct Foliage {
     pub reward_block_hash: String,
     pub foliage_block_data_signature: String,
     pub foliage_transaction_block_signature: Option<String>,
-    pub foliage_block_data: FoliageBlockData
+    pub foliage_block_data: FoliageBlockData,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -155,7 +151,7 @@ pub struct FoliageBlockData {
     pub farmer_reward_puzzle_hash: String,
     pub unfinished_reward_block_hash: String,
     pub pool_signature: Option<String>,
-    pub pool_target: PoolTarget
+    pub pool_target: PoolTarget,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -165,7 +161,7 @@ pub struct FoliageTransactionBlock {
     pub prev_transaction_block_hash: String,
     pub removals_root: String,
     pub transactions_info_hash: String,
-    pub timestamp: u64
+    pub timestamp: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -181,12 +177,12 @@ pub struct FullBlock {
     pub transactions_generator_ref_list: Vec<u32>,
     pub finished_sub_slots: Vec<SubSlotBundle>,
     pub reward_chain_block: RewardChainBlock,
-    pub transactions_info: Option<TransactionsInfo>
+    pub transactions_info: Option<TransactionsInfo>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InfusedChallengeChainSubSlot {
-    pub infused_challenge_chain_end_of_slot_vdf: VdfInfo
+    pub infused_challenge_chain_end_of_slot_vdf: VdfInfo,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -198,38 +194,33 @@ pub struct MemPoolItem {
     pub spend_bundle_name: String,
     pub program: String,
     pub additions: Vec<Coin>,
-    pub removals: Vec<Coin>
+    pub removals: Vec<Coin>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkInfo {
     pub network_name: String,
-    pub network_prefix: String
-}
-impl NetworkInfo {
-    pub fn new(network_name: String, network_prefix: String) -> Self {
-        NetworkInfo { network_name: network_name, network_prefix:network_prefix }
-    }
+    pub network_prefix: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NPC {
     pub coin_name: String,
     pub puzzle_hash: String,
-    pub conditions: Vec<(u8, Vec<(u8, String)>)>
+    pub conditions: Vec<(u8, Vec<(u8, String)>)>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NPCResult {
     pub error: Option<u16>,
     pub clvm_cost: u64,
-    pub npc_list: Vec<NPC>
+    pub npc_list: Vec<NPC>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PendingPayment {
     pub puzzle_hash: String,
-    pub amount: u64
+    pub amount: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -239,7 +230,7 @@ pub struct ProofOfSpace {
     pub plot_public_key: String,
     pub pool_public_key: Option<String>,
     pub proof: String,
-    pub size: u8
+    pub size: u8,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -263,7 +254,7 @@ pub struct RewardChainBlock {
     pub total_iters: u128,
     pub weight: u128,
     pub is_transaction_block: bool,
-    pub proof_of_space: ProofOfSpace
+    pub proof_of_space: ProofOfSpace,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -275,7 +266,7 @@ pub struct RewardChainBlockUnfinished {
     pub challenge_chain_sp_vdf: Option<VdfInfo>,
     pub challenge_chain_sp_signature: String,
     pub reward_chain_sp_vdf: Option<VdfInfo>,
-    pub reward_chain_sp_signature: String
+    pub reward_chain_sp_signature: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -283,7 +274,7 @@ pub struct RewardChainSubSlot {
     pub end_of_slot_vdf: VdfInfo,
     pub challenge_chain_sub_slot_hash: String,
     pub infused_challenge_chain_sub_slot_hash: Option<String>,
-    pub deficit: u8
+    pub deficit: u8,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -291,7 +282,7 @@ pub struct SignagePoint {
     pub cc_vdf: VdfInfo,
     pub cc_proof: VdfProof,
     pub rc_vdf: VdfInfo,
-    pub rc_proof: VdfProof
+    pub rc_proof: VdfProof,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -299,18 +290,13 @@ pub struct SignagePointOrEOS {
     pub signage_point: SignagePoint,
     pub eos: SubSlotBundle,
     pub time_received: f64,
-    pub reverted: bool
-}
-impl SignagePointOrEOS {
-    pub fn new(signage_point: SignagePoint, eos: SubSlotBundle, time_received: f64, reverted: bool) -> Self {
-        SignagePointOrEOS { signage_point: signage_point, eos:eos, time_received:time_received, reverted:reverted }
-    }
+    pub reverted: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SpendBundle {
     pub coin_spends: Vec<CoinSpend>,
-    pub aggregated_signature: String
+    pub aggregated_signature: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -327,14 +313,14 @@ pub struct SubSlotBundle {
     pub challenge_chain: ChallengeChainSubSlot,
     pub infused_challenge_chain: Option<InfusedChallengeChainSubSlot>,
     pub reward_chain: RewardChainSubSlot,
-    pub proofs: SubSlotProofs
+    pub proofs: SubSlotProofs,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubSlotProofs {
     pub challenge_chain_slot_proof: VdfProof,
     pub infused_challenge_chain_slot_proof: Option<VdfProof>,
-    pub reward_chain_slot_proof: VdfProof
+    pub reward_chain_slot_proof: VdfProof,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -342,14 +328,14 @@ pub struct Sync {
     pub sync_mode: bool,
     pub synced: bool,
     pub sync_tip_height: u32,
-    pub sync_progress_height: u32
+    pub sync_progress_height: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TransactionPeer {
     pub peer: String,
     pub error: String,
-    pub status: u32
+    pub status: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -369,7 +355,7 @@ pub struct TransactionRecord {
     pub spend_bundle: SpendBundle,
     pub additions: Vec<Coin>,
     pub removals: Vec<Coin>,
-    pub sent_to: Vec<TransactionPeer>
+    pub sent_to: Vec<TransactionPeer>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -379,14 +365,14 @@ pub struct TransactionsInfo {
     pub generator_root: String,
     pub cost: u64,
     pub fees: u64,
-    pub reward_claims_incorporated: Vec<Coin>
+    pub reward_claims_incorporated: Vec<Coin>,
 }
 
 #[derive(Deserialize)]
 pub enum TXStatus {
     SUCCESS = 1,
     PENDING = 2,
-    FAILED = 3
+    FAILED = 3,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -400,26 +386,26 @@ pub struct UnfinishedBlock {
     pub reward_chain_block: RewardChainBlockUnfinished,
     pub transactions_info: Option<TransactionsInfo>,
     pub transactions_generator: Option<String>,
-    pub transactions_generator_ref_list: Option<Vec<u32>>
+    pub transactions_generator_ref_list: Option<Vec<u32>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VdfInfo {
     pub challenge: String,
     pub output: VdfOutput,
-    pub number_of_iterations: u64
+    pub number_of_iterations: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VdfOutput {
-    pub data: String
+    pub data: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VdfProof {
     pub normalized_to_identity: bool,
     pub witness: String,
-    pub witness_type: u8
+    pub witness_type: u8,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -431,7 +417,7 @@ pub struct WalletBalance {
     pub max_send_amount: u64,
     pub pending_change: u64,
     pub spendable_balance: u64,
-    pub unconfirmed_wallet_balance: u64
+    pub unconfirmed_wallet_balance: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -440,14 +426,14 @@ pub struct WalletInfo {
     pub name: String,
     pub id: u32,
     #[serde(alias = "type")]
-    pub wallet_type: WalletType
+    pub wallet_type: WalletType,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WalletSync {
     pub genesis_initialized: bool,
     pub synced: bool,
-    pub syncing: bool
+    pub syncing: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -461,5 +447,5 @@ pub enum WalletType {
     ColouredCoin = 6,
     RECOVERABLE = 7,
     DistributedId = 8,
-    PoolingWallet = 9
+    PoolingWallet = 9,
 }
