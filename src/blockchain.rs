@@ -4,6 +4,16 @@ use sha2::{Digest, Sha256};
 use std::error::Error;
 //#[serde(deserialize_with = "crate::")]
 
+fn prep_hex_str(to_fix: &String) -> String {
+    let rtn: String;
+    if to_fix.starts_with("0x") {
+        rtn = to_fix.strip_prefix("0x").unwrap().to_string();
+    } else {
+        rtn = to_fix.to_string();
+    }
+    rtn
+}
+
 pub fn u64_to_bytes(v: u64) -> Vec<u8> {
     let mut rtn = Vec::new();
     if v.leading_zeros() == 0 {
@@ -80,20 +90,10 @@ impl Coin {
         Ok(encode(self.hash().await.unwrap()))
     }
 
-    fn prep_hex_str(&self, to_fix: &String) -> String {
-        let rtn: String;
-        if to_fix.starts_with("0x") {
-            rtn = to_fix.strip_prefix("0x").unwrap().to_string();
-        } else {
-            rtn = to_fix.to_string();
-        }
-        rtn
-    }
-
     pub async fn hash(&self) -> Result<Vec<u8>, Box<dyn Error>> {
         let mut to_hash: Vec<u8> = Vec::new();
-        to_hash.extend(decode(self.prep_hex_str(&self.parent_coin_info))?);
-        to_hash.extend(decode(self.prep_hex_str(&self.puzzle_hash))?);
+        to_hash.extend(decode(prep_hex_str(&self.parent_coin_info))?);
+        to_hash.extend(decode(prep_hex_str(&self.puzzle_hash))?);
         to_hash.extend(u64_to_bytes(self.amount));
         let mut hasher: Sha256 = Sha256::new();
         hasher.update(to_hash);
@@ -223,7 +223,7 @@ pub struct PendingPayment {
     pub amount: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct ProofOfSpace {
     pub challenge: String,
     pub pool_contract_puzzle_hash: Option<String>,
@@ -231,6 +231,133 @@ pub struct ProofOfSpace {
     pub pool_public_key: Option<String>,
     pub proof: String,
     pub size: u8,
+}
+impl ProofOfSpace {
+    // private Bytes32 getPlotId() {
+    // if (this.poolPublicKey == null || this.poolContractPuzzleHash == null) {
+    // if (this.poolPublicKey == null) {
+    // return calculatePlotIdPh(this.poolContractPuzzleHash, this.plotPublicKey);
+    // }
+    // return calculatePlotIdPk(this.poolPublicKey, this.plotPublicKey);
+    // } else {
+    // return null;
+    // }
+    // }
+    //
+    // public Bytes32 verifyAndGetQualityString(Bytes32 originalChallengeHash, Bytes32 signagePoint) {
+    //     if (this.poolPublicKey == null && this.poolContractPuzzleHash == null) {
+    //     Logger.getInstance().log(Level.WARNING, "Failed to Verify ProofOfSpace: null value for pool_public_key and pool_contract_puzzle_hash");
+    //     return null;
+    //     }
+    //     if (this.poolPublicKey != null && this.poolContractPuzzleHash != null) {
+    //     Logger.getInstance().log(Level.WARNING, "Failed to Verify ProofOfSpace: Non Null value for both for pool_public_key and pool_contract_puzzle_hash");
+    //     return null;
+    //     }
+    //     if (this.size < (Pool.getInstance().getPoolSettings().isIs_testnet() ? Constants.TESTNET_MIN_PLOT_SIZE : Constants.MIN_PLOT_SIZE)) {
+    //     Logger.getInstance().log(Level.WARNING, "Failed to Verify ProofOfSpace: Plot failed MIN_PLOT_SIZE");
+    //     return null;
+    //     }
+    //     if (this.size > Constants.MAX_PLOT_SIZE) {
+    //     Logger.getInstance().log(Level.WARNING, "Failed to Verify ProofOfSpace: Plot failed MAX_PLOT_SIZE");
+    //     return null;
+    //     }
+    //     Bytes32 plotId = getPlotId();
+    //     if (plotId == null) {
+    //     return null;
+    //     }
+    //     if (!challenge.equals(calculatePosChallenge(plotId, originalChallengeHash, signagePoint))) {
+    //     Logger.getInstance().log(Level.WARNING, "Failed to Verify ProofOfSpace: New challenge is not challenge");
+    //     return null;
+    //     }
+    //     if (!passesPlotFilter(plotId, originalChallengeHash, signagePoint)) {
+    //     Logger.getInstance().log(Level.WARNING, "Failed to Verify ProofOfSpace: Plot Failed to Pass Filter");
+    //     return null;
+    //     }
+    //     return getQualityString(plotId);
+    // }
+    //TODO USE RUST CLVM TO LOAD AND USE PUZZLE
+    // private Bytes32 getQualityString(Bytes32 plotId) {
+    //     return Puzzles.validateProof(plotId, this.size, this.challenge, this.proof);
+    // }
+    //
+    // public Bytes32 calculatePlotIdPk(Bytes48 poolPublicKey, Bytes48 plotPublicKey) {
+    //     ByteBuffer buf = ByteBuffer.allocate(96);
+    //     buf.put(poolPublicKey.getBytes());
+    //     buf.put(plotPublicKey.getBytes());
+    //     buf.flip();
+    //     return new Bytes32(SHA.hash256(buf.array()));
+    // }
+    //
+    // public Bytes32 calculatePlotIdPh(Bytes32 poolContractPuzzleHash, Bytes48 plotPublicKey) {
+    //     ByteBuffer buf = ByteBuffer.allocate(80);
+    //     buf.put(poolContractPuzzleHash.getBytes());
+    //     buf.put(plotPublicKey.getBytes());
+    //     buf.flip();
+    //     return new Bytes32(SHA.hash256(buf.array()));
+    // }
+    //
+    // public boolean passesPlotFilter(Bytes32 plotId, Bytes32 challengeHash, Bytes32 signagePoint) {
+    //     if (plotId == null || challengeHash == null || signagePoint == null) {
+    //     return false;
+    //     }
+    //     boolean[] filter = new boolean[256];
+    //     int index = 0;
+    //     for(byte b : calculatePlotFilterInput(plotId, challengeHash, signagePoint).getBytes()) {
+    //     for(int i = 7; i >=0; i-- ) {
+    //     filter[index++] = (b >> i & 1) == 1;
+    //     }
+    //     }
+    //     for (int i = 0; i < Pool.NUMBER_ZERO_BITS_PLOT_FILTER; i++) {
+    //     if (filter[i]) {
+    //     return false;
+    //     }
+    //     }
+    //     return true;
+    // }
+    //
+    // public Bytes32 calculatePlotFilterInput(Bytes32 plotId, Bytes32 challengeHash, Bytes32 signagePoint) {
+    //     if (plotId == null || challengeHash == null || signagePoint == null) {
+    //     return null;
+    //     }
+    //     ByteBuffer buf = ByteBuffer.allocate(96);
+    //     buf.put(plotId.getBytes());
+    //     buf.put(challengeHash.getBytes());
+    //     buf.put(signagePoint.getBytes());
+    //     buf.flip();
+    //     return new Bytes32(SHA.hash256(buf.array()));
+    //     }
+    //
+    //     public Bytes32 calculatePosChallenge(Bytes32 plotId, Bytes32 challengeHash, Bytes32 signagePoint) {
+    //     return new Bytes32(SHA.hash256((calculatePlotFilterInput(plotId, challengeHash, signagePoint).getBytes())));
+    // }
+
+    pub fn hash(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut to_hash: Vec<u8> = Vec::new();
+        to_hash.extend(decode(prep_hex_str(&self.challenge))?);
+        if self.pool_public_key.is_some() {
+            to_hash.push(1);
+            to_hash.extend(decode(prep_hex_str(
+                self.pool_public_key.as_ref().unwrap(),
+            ))?);
+        } else {
+            to_hash.push(0);
+        }
+        if self.pool_contract_puzzle_hash.is_some() {
+            to_hash.push(1);
+            to_hash.extend(decode(prep_hex_str(
+                &self.pool_contract_puzzle_hash.as_ref().unwrap(),
+            ))?);
+        } else {
+            to_hash.push(0);
+        }
+        to_hash.extend(decode(prep_hex_str(&self.plot_public_key))?);
+        to_hash.push(self.size);
+        to_hash.extend(decode(prep_hex_str(&self.proof))?);
+
+        let mut hasher: Sha256 = Sha256::new();
+        hasher.update(to_hash);
+        Ok(hasher.finalize().to_vec())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
