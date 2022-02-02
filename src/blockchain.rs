@@ -1,43 +1,22 @@
+use crate::sized_bytes::{prep_hex_str, u64_to_bytes};
 use hex::{decode, encode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::error::Error;
 //#[serde(deserialize_with = "crate::")]
 
-fn prep_hex_str(to_fix: &String) -> String {
-    let rtn: String;
-    if to_fix.starts_with("0x") {
-        rtn = to_fix.strip_prefix("0x").unwrap().to_string();
-    } else {
-        rtn = to_fix.to_string();
-    }
-    rtn
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Announcement {
+    pub origin_info: String,
+    pub message: Vec<u8>,
+    pub morph_bytes: Option<Vec<u8>>,
 }
 
-pub fn u64_to_bytes(v: u64) -> Vec<u8> {
-    let mut rtn = Vec::new();
-    if v.leading_zeros() == 0 {
-        rtn.push(u8::MIN);
-        let ary = v.to_be_bytes();
-        rtn.extend_from_slice(&ary);
-        rtn
-    } else {
-        let mut trim: bool = true;
-        for b in v.to_be_bytes() {
-            if trim {
-                if b == u8::MIN {
-                    continue;
-                } else {
-                    rtn.push(b);
-                    trim = false;
-                }
-            } else {
-                rtn.push(b);
-            }
-        }
-        rtn
-    }
-}
+// impl Announcement {
+//     pub fn name(&self) -> {
+//
+//     }
+// }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockchainState {
@@ -86,18 +65,18 @@ pub struct Coin {
     pub puzzle_hash: String,
 }
 impl Coin {
-    pub async fn name(&self) -> Result<String, Box<dyn Error>> {
-        Ok(encode(self.hash().await.unwrap()))
+    pub fn name(&self) -> String {
+        encode(self.hash())
     }
 
-    pub async fn hash(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn hash(&self) -> Vec<u8> {
         let mut to_hash: Vec<u8> = Vec::new();
-        to_hash.extend(decode(prep_hex_str(&self.parent_coin_info))?);
-        to_hash.extend(decode(prep_hex_str(&self.puzzle_hash))?);
+        to_hash.extend(decode(prep_hex_str(&self.parent_coin_info)).unwrap());
+        to_hash.extend(decode(prep_hex_str(&self.puzzle_hash)).unwrap());
         to_hash.extend(u64_to_bytes(self.amount));
         let mut hasher: Sha256 = Sha256::new();
         hasher.update(to_hash);
-        Ok(hasher.finalize().to_vec())
+        hasher.finalize().to_vec()
     }
 }
 
