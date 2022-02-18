@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# We need more recent updates clvm_rs = "0.1.17"
+clvmr = { git = "https://github.com/Chia-Network/clvm_rs"}
 hex = "*"
 sha2 = "*"
 serde = { version = "1.0", features = ["derive"] }
