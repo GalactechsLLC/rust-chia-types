@@ -3,7 +3,7 @@ use crate::blockchain::sized_bytes::{Bytes32, SizedBytes};
 use crate::clvm::utils::hash_256;
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct Coin {
     pub amount: u64,
     pub parent_coin_info: Bytes32,

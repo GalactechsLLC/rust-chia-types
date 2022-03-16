@@ -2,7 +2,7 @@ use crate::blockchain::coin_spend::CoinSpend;
 use crate::blockchain::sized_bytes::{Bytes32, Bytes48};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Farmer {
     pub launcher_id: Bytes32,
     pub p2_singleton_puzzle_hash: Bytes32,
@@ -20,7 +20,7 @@ pub struct Farmer {
     pub modified: u64,
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct PoolState {
     pub version: u8,
     pub state: u8,
@@ -30,9 +30,9 @@ pub struct PoolState {
     pub relative_lock_height: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct SingletonState {
     pub saved_solution: CoinSpend,
     pub saved_state: PoolState,
-    pub last_not_null_state: PoolState,
+    pub last_not_none_state: PoolState,
 }

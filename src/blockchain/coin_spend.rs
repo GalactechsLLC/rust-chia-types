@@ -4,7 +4,7 @@ use crate::clvm::serialized_program::SerializedProgram;
 use crate::clvm::utils::INFINATE_COST;
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct CoinSpend {
     pub coin: Coin,
     pub puzzle_reveal: SerializedProgram,

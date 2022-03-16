@@ -57,6 +57,7 @@ impl SerializedProgram {
     ) -> Result<(u64, NodePtr), Box<dyn Error>> {
         self.run(allocator, max_cost, MEMPOOL_MODE, args)
     }
+
     pub fn run_with_cost(
         &self,
         allocator: &mut Allocator,
@@ -66,8 +67,8 @@ impl SerializedProgram {
         self.run(allocator, max_cost, 0, args.as_slice())
     }
 
-    pub(crate) fn to_program(&self) -> Result<Program, Box<dyn Error>> {
-        Program::new(self.buffer.clone())
+    pub fn to_program(&self) -> Result<Program, Box<dyn Error>> {
+        Ok(Program::new(self.buffer.clone()))
     }
 
     fn run(

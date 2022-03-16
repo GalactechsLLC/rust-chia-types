@@ -1,5 +1,5 @@
 [package]
-name = "druid-garden-chia-types"
+name = "druid_garden_chia_types"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 # We need more recent updates clvm_rs = "0.1.17"
 clvmr = { git = "https://github.com/Chia-Network/clvm_rs"}
+clvm_tools_rs = { path = "../clvm_tools_rs" }
 hex = "*"
 sha2 = "*"
 serde = { version = "1.0", features = ["derive"] }

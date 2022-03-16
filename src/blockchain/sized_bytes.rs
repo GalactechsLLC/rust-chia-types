@@ -42,14 +42,13 @@ pub fn u64_to_bytes(v: u64) -> Vec<u8> {
     }
 }
 
-pub trait SizedBytes<'a>: Serialize + Deserialize<'a> {
+pub trait SizedBytes<'a>: Serialize + Deserialize<'a> + fmt::Display {
     const SIZE: usize;
     fn new(bytes: Vec<u8>) -> Self;
     fn from_bytes(bytes: Vec<u8>) -> Self;
     fn from_hexstr(hex: String) -> Self;
     fn to_bytes(&self) -> Vec<u8>;
     fn to_hex(&self) -> String;
-    fn to_string(&self) -> String;
 }
 
 macro_rules! impl_sized_bytes {
@@ -97,10 +96,6 @@ macro_rules! impl_sized_bytes {
                 fn to_hex(&self) -> String {
                     encode(&self.to_bytes())
                 }
-
-                fn to_string(&self) -> String {
-                    self.to_hex()
-                }
             }
             impl Serialize for $name {
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -108,6 +103,11 @@ macro_rules! impl_sized_bytes {
                     S: Serializer,
                 {
                     serializer.serialize_str(self.to_string().as_str())
+                }
+            }
+            impl fmt::Display for $name {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "{}", self.to_hex())
                 }
             }
 
