@@ -2,6 +2,7 @@ use hex::FromHexError;
 use hex::{decode, encode};
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::error::Error;
 use std::fmt;
 
 fn prep_hex_str(to_fix: &String) -> String {
@@ -45,10 +46,7 @@ pub fn u64_to_bytes(v: u64) -> Vec<u8> {
 pub trait SizedBytes<'a>: Serialize + Deserialize<'a> + fmt::Display {
     const SIZE: usize;
     fn new(bytes: Vec<u8>) -> Self;
-    fn from_bytes(bytes: Vec<u8>) -> Self;
-    fn from_hexstr(hex: String) -> Self;
     fn to_bytes(&self) -> Vec<u8>;
-    fn to_hex(&self) -> String;
 }
 
 macro_rules! impl_sized_bytes {
@@ -69,33 +67,6 @@ macro_rules! impl_sized_bytes {
                 fn to_bytes(&self) -> Vec<u8> {
                     self.bytes.clone()
                 }
-
-                fn from_bytes(bytes: Vec<u8>) -> Self {
-                    if 0 != Self::SIZE && bytes.len() != Self::SIZE {
-                        panic!(
-                            "Invalid Byte Length for bytes{}: {}",
-                            Self::SIZE,
-                            bytes.len()
-                        )
-                    } else {
-                        $name { bytes : bytes }
-                    }
-                }
-
-                fn from_hexstr(hex: String) -> Self {
-                    let bytes: Vec<u8> = decode(prep_hex_str(&hex)).unwrap();
-                    if 0 != Self::SIZE && bytes.len() != Self::SIZE {
-                        panic!(
-                            "Invalid Byte Length for bytes{}: {}",
-                            Self::SIZE,
-                            bytes.len()
-                        )
-                    }
-                    $name { bytes : bytes }
-                }
-                fn to_hex(&self) -> String {
-                    encode(&self.to_bytes())
-                }
             }
             impl Serialize for $name {
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -107,7 +78,60 @@ macro_rules! impl_sized_bytes {
             }
             impl fmt::Display for $name {
                 fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                    write!(f, "{}", self.to_hex())
+                    write!(f, "{}", encode(&self.bytes))
+                }
+            }
+
+            impl From<Vec<u8>> for $name {
+                fn from(bytes: Vec<u8>) -> Self {
+                    if 0 != Self::SIZE && bytes.len() > Self::SIZE {
+                        $name { bytes : bytes[..Self::SIZE].to_vec() }
+                    } else if 0 != Self::SIZE && bytes.len() < Self::SIZE {
+                        let mut m_bytes: Vec<u8> = Vec::new();
+                        m_bytes.extend(&bytes);
+                        m_bytes.append(&mut b"\x00".repeat(Self::SIZE));
+                        $name { bytes : m_bytes[..Self::SIZE].to_vec() }
+                    } else {
+                        $name { bytes : bytes }
+                    }
+                }
+            }
+
+            impl Into<Vec<u8>> for $name {
+                fn into(self) -> Vec<u8> {
+                    self.bytes.clone()
+                }
+            }
+
+            impl From<String> for $name {
+                fn from(hex: String) -> Self {
+                    let bytes: Vec<u8> = decode(prep_hex_str(&hex)).unwrap();
+                    if 0 != Self::SIZE && bytes.len() > Self::SIZE {
+                        $name { bytes : bytes[..Self::SIZE].to_vec() }
+                    } else if 0 != Self::SIZE && bytes.len() < Self::SIZE {
+                        let mut m_bytes: Vec<u8> = Vec::new();
+                        m_bytes.extend(&bytes);
+                        m_bytes.append(&mut b"\x00".repeat(Self::SIZE));
+                        $name { bytes : m_bytes[..Self::SIZE].to_vec() }
+                    } else {
+                        $name { bytes : bytes }
+                    }
+                }
+            }
+
+            impl From<&str> for $name {
+                fn from(hex: &str) -> Self {
+                    let bytes: Vec<u8> = decode(prep_hex_str(&hex.to_string())).unwrap();
+                    if 0 != Self::SIZE && bytes.len() > Self::SIZE {
+                        $name { bytes : bytes[..Self::SIZE].to_vec() }
+                    } else if 0 != Self::SIZE && bytes.len() < Self::SIZE {
+                        let mut m_bytes: Vec<u8> = Vec::new();
+                        m_bytes.extend(&bytes);
+                        m_bytes.append(&mut b"\x00".repeat(Self::SIZE));
+                        $name { bytes : m_bytes[..Self::SIZE].to_vec() }
+                    } else {
+                        $name { bytes : bytes }
+                    }
                 }
             }
 
@@ -122,9 +146,9 @@ macro_rules! impl_sized_bytes {
 
                 fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
                 where
-                    E: serde::de::Error,
+                    E: Error,
                 {
-                    Ok($name::from_hexstr(value))
+                    Ok(value.into())
                 }
 
             }

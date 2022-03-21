@@ -1,7 +1,11 @@
+use crate::blockchain::sized_bytes::*;
+use crate::clvm::serialized_program::SerializedProgram;
 use clvmr::allocator::SExp::{Atom, Pair};
-use clvmr::allocator::{Allocator, NodePtr, SExp};
+use clvmr::allocator::{Allocator, SExp};
 use clvmr::node::Node;
 use clvmr::serialize::{node_from_bytes, node_to_bytes};
+use num_bigint::BigInt;
+use serde::ser::StdError;
 use std::collections::HashMap;
 use std::error::Error;
 use std::str;
@@ -11,26 +15,22 @@ pub struct Program {
     serialized: Vec<u8>,
 }
 impl Program {
-    // pub fn curry() -> {
-    //
-    // }
-    //
-    // pub fn uncurry() -> {
-    //
-    // }
+    pub fn curry(&self, args: Vec<Program>) -> Result<Program, Box<dyn Error>> {
+        SerializedProgram::from_bytes(&Vec::new()).to_program()
+    }
 
-    fn null_pointer(&self, node_ptr: Option<NodePtr>) -> bool {
-        let alloc = Allocator::new();
-        match node_ptr {
-            Some(node_ptr) => {
-                if node_ptr < 0 {
-                    let atom = alloc.atom(node_ptr);
-                    atom.len() == 0
-                } else {
-                    false
-                }
-            }
-            None => false,
+    pub fn uncurry(&self) -> Result<(Program, Program), Box<dyn Error>> {
+        Ok((
+            SerializedProgram::from_bytes(&Vec::new()).to_program()?,
+            SerializedProgram::from_bytes(&Vec::new()).to_program()?,
+        ))
+    }
+
+    fn null_pointer(&self) -> Result<bool, Box<dyn Error>> {
+        let mut alloc = Allocator::new();
+        match self.to_sexp(&mut alloc)? {
+            Pair(_, _) => Ok(false),
+            Atom(atom_buf) => Ok(alloc.buf(&atom_buf).len() == 0),
         }
     }
 
@@ -82,9 +82,33 @@ impl Program {
         Ok(rtn)
     }
 
+    pub fn get_tree_hash(&self, args: &Vec<Bytes32>) -> Result<Bytes32, Box<dyn Error>> {
+        SerializedProgram::from_bytes(&self.serialized).get_tree_hash(args)
+    }
+
     pub fn to_sexp(&self, alloc: &mut Allocator) -> Result<SExp, Box<dyn Error>> {
         let node = node_from_bytes(alloc, &self.serialized)?;
         Ok(alloc.sexp(node))
+    }
+
+    pub fn is_atom(&self) -> Result<bool, Box<dyn Error>> {
+        let mut alloc = Allocator::new();
+        match self.to_sexp(&mut alloc)? {
+            Pair(_, _) => Ok(false),
+            Atom(_) => Ok(true),
+        }
+    }
+
+    pub fn as_atom(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        let mut alloc = Allocator::new();
+        match self.to_sexp(&mut alloc)? {
+            Pair(_, _) => Err("Not an Atom".into()),
+            Atom(atom_buf) => Ok(alloc.buf(&atom_buf).to_vec()),
+        }
+    }
+
+    pub fn as_int(&self) -> Result<BigInt, Box<dyn Error>> {
+        Ok(BigInt::from_signed_bytes_be(self.as_atom()?.as_slice()))
     }
 
     pub fn first(&self) -> Result<Program, Box<dyn Error>> {
@@ -116,44 +140,162 @@ impl Program {
     }
 
     pub fn iter(&self) -> ProgramIter {
-        let mut alloc = Allocator::new();
         let cloned = self.clone();
         ProgramIter {
             program: cloned,
-            current_node: match node_from_bytes(&mut alloc, &self.serialized) {
-                Ok(node_ptr) => Some(node_ptr),
-                Err(_error) => None,
-            },
-            allocator: alloc,
+            current_node: None,
         }
     }
 }
-pub struct ProgramIter {
-    program: Program,
-    current_node: Option<NodePtr>,
-    allocator: Allocator,
+
+impl Into<SerializedProgram> for Program {
+    fn into(self) -> SerializedProgram {
+        SerializedProgram::from_bytes(&self.serialized)
+    }
 }
-impl Iterator for ProgramIter {
-    type Item = SExp;
-    fn next(&mut self) -> Option<Self::Item> {
-        let cur_node = match self.current_node {
-            Some(node) => Some(node),
-            None => match node_from_bytes(&mut self.allocator, &self.program.serialized) {
-                Ok(node_ptr) => Some(node_ptr),
-                Err(_error) => None,
-            },
-        };
-        if !self.program.null_pointer(cur_node) {
-            let sexp = self.allocator.sexp(self.current_node.unwrap());
-            match sexp {
-                Atom(_buf) => None,
-                Pair(node_ptr, node_ptr2) => {
-                    self.current_node = Some(node_ptr2);
-                    Some(self.allocator.sexp(node_ptr))
+
+impl From<Vec<u8>> for Program {
+    fn from(bytes: Vec<u8>) -> Self {
+        SerializedProgram::from_bytes(&bytes)
+            .to_program()
+            .unwrap_or(Program::new(Vec::new()))
+    }
+}
+
+impl From<&Vec<u8>> for Program {
+    fn from(bytes: &Vec<u8>) -> Self {
+        SerializedProgram::from_bytes(bytes)
+            .to_program()
+            .unwrap_or(Program::new(Vec::new()))
+    }
+}
+
+impl TryFrom<(Program, Program)> for Program {
+    type Error = Box<(dyn StdError + 'static)>;
+    fn try_from((first, second): (Program, Program)) -> Result<Self, Self::Error> {
+        let mut alloc = Allocator::new();
+        let first = node_from_bytes(&mut alloc, &first.serialized.as_slice())?;
+        let rest = node_from_bytes(&mut alloc, &second.serialized.as_slice())?;
+        match alloc.new_pair(first, rest) {
+            Ok(pair) => Ok(SerializedProgram::from_bytes(&node_to_bytes(&Node {
+                allocator: &alloc,
+                node: pair,
+            })?)
+            .to_program()
+            .unwrap_or(Program::new(Vec::new()))),
+            Err(error) => Err(error.1.into()),
+        }
+    }
+}
+
+macro_rules! impl_sized_bytes {
+    ($($name: ident);*) => {
+        $(
+            impl From<$name> for Program {
+                fn from(bytes: $name) -> Self {
+                    SerializedProgram::from_bytes(&bytes.to_bytes())
+                        .to_program()
+                        .unwrap_or(Program::new(Vec::new()))
                 }
             }
-        } else {
-            None
+            impl From<&$name> for Program {
+                fn from(bytes: &$name) -> Self {
+                    SerializedProgram::from_bytes(&bytes.to_bytes())
+                        .to_program()
+                        .unwrap_or(Program::new(Vec::new()))
+                }
+            }
+        )*
+    };
+    ()=>{};
+}
+
+impl_sized_bytes!(
+    UnsizedBytes;
+    Bytes4;
+    Bytes8;
+    Bytes16;
+    Bytes32;
+    Bytes48;
+    Bytes96;
+    Bytes192
+);
+
+macro_rules! impl_ints {
+    ($($name: ident, $size: expr);*) => {
+        $(
+            impl From<$name> for Program {
+                fn from(int_val: $name) -> Self {
+                    if int_val == 0 {
+                        return Program::new(Vec::new());
+                    }
+                    let as_ary = int_val.to_be_bytes();
+                    let mut as_bytes = as_ary.as_slice();
+                    while as_bytes.len() > 1 && as_bytes[0] == ( if as_bytes[1] & 0x80 > 0{0xFF} else {0}) {
+                        as_bytes = &as_bytes[1..];
+                    }
+                    SerializedProgram::from_bytes(&as_bytes.to_vec())
+                        .to_program()
+                        .unwrap_or(Program::new(Vec::new()))
+                }
+            }
+            impl Into<$name> for Program {
+                fn into(self) -> $name {
+                    let mut byte_ary: [u8; $size] = [0; $size];
+                    byte_ary[..$size].clone_from_slice(&self.serialized);
+                    $name::from_be_bytes(byte_ary)
+                }
+            }
+        )*
+    };
+    ()=>{};
+}
+
+impl_ints!(
+    u8, 1;
+    u16, 2;
+    u32, 4;
+    u64, 8;
+    u128, 16;
+    i8, 1;
+    i16, 2;
+    i32, 4;
+    i64, 8;
+    i128, 16
+);
+
+pub struct ProgramIter {
+    program: Program,
+    current_node: Option<Program>,
+}
+impl Iterator for ProgramIter {
+    type Item = Program;
+    fn next(&mut self) -> Option<Self::Item> {
+        let cur_node = match &self.current_node {
+            Some(node) => node.clone(),
+            None => self.program.clone(),
+        };
+        match &self.program.null_pointer() {
+            Ok(is_nullp) => {
+                if !is_nullp {
+                    let rtn = match cur_node.first() {
+                        Ok(program) => program,
+                        Err(_) => {
+                            return None;
+                        }
+                    };
+                    self.current_node = match cur_node.rest() {
+                        Ok(program) => Some(program),
+                        Err(_) => {
+                            return None;
+                        }
+                    };
+                    Some(rtn)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
         }
     }
 }

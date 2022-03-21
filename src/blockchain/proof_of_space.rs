@@ -15,11 +15,11 @@ pub struct ProofOfSpace {
 impl ProofOfSpace {
     pub fn hash(&self) -> Result<Vec<u8>, Box<dyn Error>> {
         let mut to_hash: Vec<u8> = Vec::new();
-        to_hash.extend(&self.challenge.to_bytes());
+        to_hash.extend(&self.challenge.clone().to_bytes());
         match &self.pool_public_key {
             Some(public_key) => {
                 to_hash.push(1);
-                to_hash.extend(&public_key.to_bytes());
+                to_hash.extend(public_key.to_bytes());
             }
             None => {
                 to_hash.push(0);
@@ -28,7 +28,7 @@ impl ProofOfSpace {
         match &self.pool_contract_puzzle_hash {
             Some(contract_hash) => {
                 to_hash.push(1);
-                to_hash.extend(&contract_hash.to_bytes());
+                to_hash.extend(contract_hash.to_bytes());
             }
             None => {
                 to_hash.push(0);

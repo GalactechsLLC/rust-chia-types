@@ -3,7 +3,6 @@ use crate::blockchain::coin::Coin;
 use crate::blockchain::condition_opcode::ConditionOpcode;
 use crate::blockchain::condition_with_args::ConditionWithArgs;
 use crate::blockchain::sized_bytes::Bytes32;
-use crate::blockchain::sized_bytes::SizedBytes;
 use crate::blockchain::utils::atom_to_uint;
 use crate::clvm::program::Program;
 use crate::clvm::serialized_program::SerializedProgram;
@@ -81,7 +80,7 @@ pub fn created_outputs_for_conditions_dict(
                 let amount = atom_to_uint(&cvp.vars[1]);
                 let coin = Coin {
                     parent_coin_info: input_coin_name.clone(),
-                    puzzle_hash: Bytes32::from_bytes(puz_hash),
+                    puzzle_hash: puz_hash.into(),
                     amount,
                 };
                 output_coins.push(coin);

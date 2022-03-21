@@ -1,6 +1,7 @@
 use crate::blockchain::coin_spend::CoinSpend;
 use crate::blockchain::sized_bytes::{Bytes32, Bytes48};
 use serde::{Deserialize, Serialize};
+use std::string::String;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Farmer {
@@ -29,10 +30,55 @@ pub struct PoolState {
     pub pool_url: String,
     pub relative_lock_height: u32,
 }
+impl From<Vec<u8>> for PoolState {
+    fn from(bytes: Vec<u8>) -> Self {
+        let version = bytes[0];
+        let state = bytes[1];
+        let target_puzzle_hash: Bytes32 = bytes[2..34].to_vec().into();
+        let owner_pubkey: Bytes48 = bytes[35..82].to_vec().into();
+        let has_url = bytes[83];
+        let mut pool_url: String = String::new();
+        let relative_lock_height: u32;
+        if has_url == 1 {
+            let mut len_ary: [u8; 4] = [0; 4];
+            len_ary.copy_from_slice(&bytes[84..88]);
+            let length = u32::from_be_bytes(len_ary);
+            let url_length: usize = (89 + length) as usize;
+            let mut url_vec = Vec::new();
+            url_vec.append(&mut bytes[89..url_length].to_vec());
+            pool_url = match String::from_utf8(url_vec) {
+                Ok(string) => string,
+                Err(_) => String::new(),
+            };
+            let mut lh_ary: [u8; 4] = [0; 4];
+            lh_ary.copy_from_slice(&bytes[url_length + 1..url_length + 5]);
+            relative_lock_height = u32::from_be_bytes(lh_ary);
+        } else {
+            let mut lh_ary: [u8; 4] = [0; 4];
+            lh_ary.copy_from_slice(&bytes[84..88]);
+            relative_lock_height = u32::from_be_bytes(lh_ary);
+        }
+        PoolState {
+            version,
+            state,
+            target_puzzle_hash,
+            owner_pubkey,
+            pool_url,
+            relative_lock_height,
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct SingletonState {
     pub saved_solution: CoinSpend,
     pub saved_state: PoolState,
     pub last_not_none_state: PoolState,
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
+pub struct ValidatedSingletonState {
+    pub saved_solution: CoinSpend,
+    pub saved_state: PoolState,
+    pub is_pool_member: bool,
 }

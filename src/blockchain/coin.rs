@@ -11,7 +11,7 @@ pub struct Coin {
 }
 impl Coin {
     pub fn name(&self) -> Bytes32 {
-        Bytes32::from_bytes(self.hash())
+        self.hash().into()
     }
 
     pub fn hash(&self) -> Vec<u8> {

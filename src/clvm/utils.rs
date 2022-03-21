@@ -1,4 +1,4 @@
-use crate::blockchain::sized_bytes::{Bytes32, SizedBytes};
+use crate::blockchain::sized_bytes::Bytes32;
 use clvmr::allocator::SExp::Atom;
 use clvmr::allocator::SExp::Pair;
 use clvmr::allocator::{Allocator, NodePtr};
@@ -21,21 +21,21 @@ pub fn tree_hash(
     match alloc.sexp(node_ptr) {
         Atom(_buf) => {
             let atom = alloc.atom(node_ptr);
-            if precalculated.contains(&Bytes32::from_bytes(Vec::from(atom))) {
-                Ok(Bytes32::from_bytes(Vec::from(atom)))
+            if precalculated.contains(&Vec::from(atom).into()) {
+                Ok(Vec::from(atom).into())
             } else {
                 let mut byte_buf = Vec::new();
                 byte_buf.extend([b'1']);
                 byte_buf.extend(atom);
-                Ok(Bytes32::from_bytes(hash_256(byte_buf)))
+                Ok(hash_256(byte_buf).into())
             }
         }
         Pair(first, rest) => {
             let mut byte_buf = Vec::new();
             byte_buf.extend([b'2']);
-            byte_buf.extend(tree_hash(&alloc, first, &precalculated)?.to_bytes());
-            byte_buf.extend(tree_hash(&alloc, rest, &precalculated)?.to_bytes());
-            Ok(Bytes32::from_bytes(hash_256(byte_buf)))
+            byte_buf.append(&mut tree_hash(&alloc, first, &precalculated)?.into());
+            byte_buf.append(&mut tree_hash(&alloc, rest, &precalculated)?.into());
+            Ok(hash_256(byte_buf).into())
         }
     }
 }
