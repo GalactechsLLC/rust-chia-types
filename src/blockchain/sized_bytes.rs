@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::error::Error;
 use std::fmt;
 
-fn prep_hex_str(to_fix: &String) -> String {
+pub fn prep_hex_str(to_fix: &String) -> String {
     let lc = to_fix.to_lowercase();
     if lc.starts_with("0x") {
         lc.strip_prefix("0x").unwrap().to_string()

@@ -1,4 +1,5 @@
 use crate::blockchain::sized_bytes::*;
+use crate::clvm::curry_utils::{curry, uncurry};
 use crate::clvm::serialized_program::SerializedProgram;
 use clvmr::allocator::SExp::{Atom, Pair};
 use clvmr::allocator::{Allocator, SExp};
@@ -12,18 +13,20 @@ use std::str;
 
 #[derive(Clone)]
 pub struct Program {
-    serialized: Vec<u8>,
+    pub serialized: Vec<u8>,
 }
 impl Program {
-    pub fn curry(&self, args: Vec<Program>) -> Result<Program, Box<dyn Error>> {
-        SerializedProgram::from_bytes(&Vec::new()).to_program()
+    pub fn curry(&self, args: &[u8]) -> Result<Program, Box<dyn Error>> {
+        let (_cost, program) = curry(&SerializedProgram::from_bytes(&self.serialized), args)?;
+        Ok(program)
     }
 
     pub fn uncurry(&self) -> Result<(Program, Program), Box<dyn Error>> {
-        Ok((
-            SerializedProgram::from_bytes(&Vec::new()).to_program()?,
-            SerializedProgram::from_bytes(&Vec::new()).to_program()?,
-        ))
+        let serial_program = SerializedProgram::from_bytes(&self.serialized);
+        match uncurry(&serial_program)? {
+            Some((program, args)) => Ok((program.to_program()?, args.to_program()?)),
+            None => Ok((serial_program.to_program()?, 0.into())),
+        }
     }
 
     fn null_pointer(&self) -> Result<bool, Box<dyn Error>> {

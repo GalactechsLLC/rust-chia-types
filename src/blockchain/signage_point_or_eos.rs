@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SignagePointOrEOS {
-    pub signage_point: SignagePoint,
-    pub eos: SubSlotBundle,
+    pub signage_point: Option<SignagePoint>,
+    pub eos: Option<SubSlotBundle>,
     pub time_received: f64,
     pub reverted: bool,
 }
