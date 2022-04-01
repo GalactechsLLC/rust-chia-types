@@ -19,12 +19,12 @@ impl ProofOfSpace {
         if self.pool_public_key.is_none() || self.pool_contract_puzzle_hash.is_none() {
             if self.pool_public_key.is_none() && self.pool_contract_puzzle_hash.is_some() {
                 return Ok(Some(self.calculate_plot_id_puzzle_hash(
-                    &self.pool_contract_puzzle_hash.clone().unwrap(),
+                    &self.pool_contract_puzzle_hash.as_ref().unwrap(),
                     &self.plot_public_key,
                 )?));
             }
             return Ok(Some(self.calculate_plot_id_public_key(
-                &self.pool_public_key.clone().unwrap(),
+                &self.pool_public_key.as_ref().unwrap(),
                 &self.plot_public_key,
             )?));
         } else {
@@ -59,7 +59,7 @@ impl ProofOfSpace {
         if plot_id_result == None {
             return Ok(None);
         }
-        let plot_id = plot_id_result.unwrap();
+        let plot_id = plot_id_result.unwrap().clone();
         if &self.challenge
             != &self.calculate_pos_challenge(&plot_id, original_challenge_hash, signage_point)?
         {
