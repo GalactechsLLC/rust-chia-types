@@ -68,6 +68,13 @@ macro_rules! impl_sized_bytes {
                     self.bytes.clone()
                 }
             }
+            impl $name {
+                pub fn to_sized_bytes(&self) -> [u8; $size] {
+                    let mut sized: [u8; $size] = [0; $size];
+                    sized[0..32].clone_from_slice(&self.bytes[0..]);
+                    sized
+                }
+            }
             impl Serialize for $name {
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where

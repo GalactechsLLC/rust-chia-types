@@ -1,4 +1,5 @@
 use crate::blockchain::sized_bytes::{Bytes32, Bytes48, SizedBytes};
+use druid_garden_chiapos::chiapos::verifier::validate_proof;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::error::Error;
@@ -74,8 +75,12 @@ impl ProofOfSpace {
     }
 
     pub fn get_quality_string(&self, plot_id: &Bytes32) -> Result<Bytes32, Box<dyn Error>> {
-        //Puzzles.validateProof(plot_id, this.size, this.challenge, this.proof)
-        Ok(Bytes32::new(Vec::new()))
+        Ok(Bytes32::new(validate_proof(
+            &plot_id.to_sized_bytes(),
+            self.size,
+            &self.challenge.to_bytes(),
+            &self.proof,
+        )?))
     }
 
     pub fn calculate_plot_id_public_key(

@@ -9,6 +9,7 @@ edition = "2021"
 # We need more recent updates clvm_rs = "0.1.17"
 clvmr = { git = "https://github.com/Chia-Network/clvm_rs"}
 clvm_tools_rs = {git = "https://github.com/Chia-Network/clvm_tools_rs"}
+druid_garden_chiapos = { path="../RustChiaPOS" }
 hex = "*"
 sha2 = "*"
 serde = { version = "1.0", features = ["derive"] }
