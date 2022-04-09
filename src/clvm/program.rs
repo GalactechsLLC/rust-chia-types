@@ -9,11 +9,13 @@ use num_bigint::BigInt;
 use serde::ser::StdError;
 use std::collections::HashMap;
 use std::error::Error;
-use std::str;
+use std::hash::Hash;
+use std::hash::Hasher;
 
-#[derive(Clone)]
 pub struct Program {
     pub serialized: Vec<u8>,
+    alloc: Allocator,
+    nodeptr: i32,
 }
 impl Program {
     pub fn curry(&self, args: &[u8]) -> Result<Program, Box<dyn Error>> {
@@ -29,26 +31,17 @@ impl Program {
         }
     }
 
-    fn null_pointer(&self) -> Result<bool, Box<dyn Error>> {
-        let mut alloc = Allocator::new();
-        match self.to_sexp(&mut alloc)? {
-            Pair(_, _) => Ok(false),
-            Atom(atom_buf) => Ok(alloc.buf(&atom_buf).len() == 0),
-        }
-    }
-
-    pub fn as_atom_list(&self) -> Option<Vec<Vec<u8>>> {
+    pub fn as_atom_list(&mut self) -> Option<Vec<Vec<u8>>> {
         let mut rtn: Vec<Vec<u8>> = Vec::new();
-        let mut alloc = Allocator::new();
-        match node_from_bytes(&mut alloc, &self.serialized) {
+        match node_from_bytes(&mut self.alloc, &self.serialized) {
             Ok(program) => {
                 let mut cur_node = program;
                 loop {
-                    let sexp = alloc.sexp(cur_node);
+                    let sexp = self.alloc.sexp(cur_node);
                     match sexp {
                         Atom(_buf) => break,
                         Pair(node_ptr, node_ptr2) => {
-                            rtn.extend([Vec::from(alloc.atom(node_ptr))]);
+                            rtn.extend([Vec::from(self.alloc.atom(node_ptr))]);
                             cur_node = node_ptr2;
                         }
                     }
@@ -59,24 +52,33 @@ impl Program {
         }
     }
 
-    pub fn to_map(&self) -> Result<HashMap<String, Vec<u8>>, Box<dyn Error>> {
-        let mut rtn: HashMap<String, Vec<u8>> = HashMap::new();
-        let mut alloc = Allocator::new();
-        let mut sexp = self.to_sexp(&mut alloc)?;
+    // fn node_to_program(&mut alloc: Allocator, node_ptr: NodePtr) -> Program {
+    //     match alloc.sexp(node_ptr) {
+    //         Atom(buf) => Program::new(alloc.buf(&buf).to_vec()),
+    //         Pair(key, value) => (
+    //             node_to_program(&mut alloc, key),
+    //             node_to_program(&mut alloc, value),
+    //         )
+    //             .into(),
+    //     }
+    // }
+
+    pub fn to_map(self) -> Result<HashMap<Program, Program>, Box<dyn Error>> {
+        let mut rtn: HashMap<Program, Program> = HashMap::new();
+        let mut cur_node = self;
         loop {
-            match sexp {
+            match cur_node.to_sexp() {
                 Atom(_) => break,
-                Pair(ptr, ptr2) => {
-                    sexp = alloc.sexp(ptr2);
-                    match alloc.sexp(ptr) {
-                        Atom(buf) => {
-                            rtn.insert(str::from_utf8(alloc.buf(&buf))?.to_string(), Vec::new());
+                Pair(_, _) => {
+                    let pair = cur_node.as_pair().unwrap();
+                    cur_node = pair.1;
+                    match pair.0.to_sexp() {
+                        Atom(_) => {
+                            rtn.insert(pair.0.as_atom().unwrap(), Program::new(Vec::new()));
                         }
-                        Pair(key, value) => {
-                            rtn.insert(
-                                str::from_utf8(alloc.atom(key))?.to_string(),
-                                alloc.atom(value).to_vec(),
-                            );
+                        Pair(_, _) => {
+                            let inner_pair = pair.0.as_pair().unwrap();
+                            rtn.insert(inner_pair.0, inner_pair.1);
                         }
                     }
                 }
@@ -89,64 +91,101 @@ impl Program {
         SerializedProgram::from_bytes(&self.serialized).get_tree_hash(args)
     }
 
-    pub fn to_sexp(&self, alloc: &mut Allocator) -> Result<SExp, Box<dyn Error>> {
-        let node = node_from_bytes(alloc, &self.serialized)?;
-        Ok(alloc.sexp(node))
+    pub fn to_sexp(&self) -> SExp {
+        self.alloc.sexp(self.nodeptr)
     }
 
-    pub fn is_atom(&self) -> Result<bool, Box<dyn Error>> {
-        let mut alloc = Allocator::new();
-        match self.to_sexp(&mut alloc)? {
-            Pair(_, _) => Ok(false),
-            Atom(_) => Ok(true),
+    pub fn to_node(&self) -> Node {
+        Node::new(&self.alloc, self.nodeptr).clone()
+    }
+
+    pub fn is_atom(&self) -> bool {
+        self.as_atom().is_some()
+    }
+
+    pub fn as_atom(&self) -> Option<Program> {
+        match self.to_sexp() {
+            Atom(_) => Some(Program::new(self.alloc.atom(self.nodeptr).to_vec())),
+            _ => None,
         }
     }
 
-    pub fn as_atom(&self) -> Result<Vec<u8>, Box<dyn Error>> {
-        let mut alloc = Allocator::new();
-        match self.to_sexp(&mut alloc)? {
-            Pair(_, _) => Err("Not an Atom".into()),
-            Atom(atom_buf) => Ok(alloc.buf(&atom_buf).to_vec()),
+    pub fn as_pair(&self) -> Option<(Program, Program)> {
+        match self.to_sexp() {
+            Pair(p1, p2) => {
+                let left_node = Node::new(&self.alloc, p1);
+                let right_node = Node::new(&self.alloc, p2);
+                let left = match node_to_bytes(&left_node) {
+                    Ok(serial_data) => Program::new(serial_data),
+                    Err(_) => Program::new(Vec::new()),
+                };
+                let right = match node_to_bytes(&right_node) {
+                    Ok(serial_data) => Program::new(serial_data),
+                    Err(_) => Program::new(Vec::new()),
+                };
+                Some((left, right))
+            }
+            _ => None,
         }
     }
 
     pub fn as_int(&self) -> Result<BigInt, Box<dyn Error>> {
-        Ok(BigInt::from_signed_bytes_be(self.as_atom()?.as_slice()))
+        match &self.as_atom() {
+            Some(atom) => Ok(BigInt::from_signed_bytes_be(atom.serialized.as_slice())),
+            None => {
+                log::debug!("BAD INT: {:?}", self.serialized);
+                Err("Program is Pair not Atom".into())
+            }
+        }
     }
 
     pub fn first(&self) -> Result<Program, Box<dyn Error>> {
-        let mut alloc = Allocator::new();
-        match self.to_sexp(&mut alloc)? {
-            Pair(node_ptr, _node_ptr2) => {
-                let node = Node::new(&alloc, node_ptr);
-                match node_to_bytes(&node) {
-                    Ok(serial_data) => Ok(Program::new(serial_data)),
-                    Err(error) => Err(Box::new(error)),
-                }
-            }
-            Atom(_buf) => Err("First of non-cons".into()),
+        match self.as_pair() {
+            Some((p1, _)) => Ok(p1),
+            _ => Err("first of non-cons".into()),
         }
     }
 
     pub fn rest(&self) -> Result<Program, Box<dyn Error>> {
-        let mut alloc = Allocator::new();
-        match self.to_sexp(&mut alloc)? {
-            Pair(_node_ptr, node_ptr2) => {
-                let node = Node::new(&alloc, node_ptr2);
-                match node_to_bytes(&node) {
-                    Ok(serial_data) => Ok(Program::new(serial_data)),
-                    Err(error) => Err(Box::new(error)),
-                }
-            }
-            Atom(_buf) => Err("First of non-cons".into()),
+        match self.as_pair() {
+            Some((_, p2)) => Ok(p2),
+            _ => Err("rest of non-cons".into()),
         }
     }
 
+    // pub fn first(&self) -> Result<Program, Box<dyn Error>> {
+    //     let alloc = Allocator::new();
+    //     match self.to_sexp() {
+    //         Pair(node_ptr, _node_ptr2) => {
+    //             let node = Node::new(&alloc, node_ptr);
+    //             match node_to_bytes(&node) {
+    //                 Ok(serial_data) => Ok(Program::new(serial_data)),
+    //                 Err(error) => Err(Box::new(error)),
+    //             }
+    //         }
+    //         Atom(_buf) => Err("First of non-cons".into()),
+    //     }
+    // }
+    //
+    // pub fn rest(&mut self) -> Result<Program, Box<dyn Error>> {
+    //     match self.to_sexp() {
+    //         Pair(_node_ptr, node_ptr2) => {
+    //             match node_to_bytes(
+    //                 &Node::new(&mut self.alloc, node_ptr2)
+    //                     .rest()
+    //                     .map_err(|e| e.1)?,
+    //             ) {
+    //                 Ok(serial_data) => Ok(Program::new(serial_data)),
+    //                 Err(error) => Err(Box::new(error)),
+    //             }
+    //         }
+    //         Atom(_buf) => Err("First of non-cons".into()),
+    //     }
+    // }
+
     pub fn iter(&self) -> ProgramIter {
-        let cloned = self.clone();
         ProgramIter {
-            program: cloned,
-            current_node: None,
+            node: Node::new(&self.alloc, self.nodeptr).clone().into_iter(),
         }
     }
 }
@@ -267,45 +306,57 @@ impl_ints!(
     i128, 16
 );
 
-pub struct ProgramIter {
-    program: Program,
-    current_node: Option<Program>,
+pub struct ProgramIter<'a> {
+    node: Node<'a>,
 }
-impl Iterator for ProgramIter {
+impl Iterator for ProgramIter<'_> {
     type Item = Program;
     fn next(&mut self) -> Option<Self::Item> {
-        let cur_node = match &self.current_node {
-            Some(node) => node.clone(),
-            None => self.program.clone(),
-        };
-        match &self.program.null_pointer() {
-            Ok(is_nullp) => {
-                if !is_nullp {
-                    let rtn = match cur_node.first() {
-                        Ok(program) => program,
-                        Err(_) => {
-                            return None;
-                        }
-                    };
-                    self.current_node = match cur_node.rest() {
-                        Ok(program) => Some(program),
-                        Err(_) => {
-                            return None;
-                        }
-                    };
-                    Some(rtn)
-                } else {
-                    None
-                }
-            }
-            Err(_) => None,
+        match self.node.next() {
+            Some(m_node) => match node_to_bytes(&m_node) {
+                Ok(bytes) => Some(Program::from(bytes)),
+                Err(_) => None,
+            },
+            None => None,
         }
     }
 }
+
+impl Clone for Program {
+    fn clone(&self) -> Self {
+        Program::new(self.serialized.clone())
+    }
+}
+
+impl Hash for Program {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.serialized.hash(state);
+    }
+}
+
+impl PartialEq for Program {
+    fn eq(&self, other: &Self) -> bool {
+        self.serialized == other.serialized
+    }
+}
+impl Eq for Program {}
+
 impl Program {
     pub fn new(serialized: Vec<u8>) -> Self {
-        Program {
+        let alloc = Allocator::new();
+        let null = alloc.null();
+        let mut prog = Program {
             serialized: serialized.clone(),
-        }
+            alloc: alloc,
+            nodeptr: null,
+        };
+        prog.set_node();
+        prog
+    }
+    fn set_node(&mut self) {
+        self.nodeptr = match node_from_bytes(&mut self.alloc, &self.serialized) {
+            Ok(node) => node,
+            Err(_) => self.alloc.null(),
+        };
     }
 }

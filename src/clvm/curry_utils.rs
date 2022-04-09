@@ -87,19 +87,21 @@ pub fn uncurry(
     }
 }
 
-pub fn curry(program: &SerializedProgram, args: &[u8]) -> Result<(Cost, Program), Box<dyn Error>> {
+pub fn curry<'a>(
+    program: &SerializedProgram,
+    args: &[u8],
+) -> Result<(Cost, Program), Box<dyn Error>> {
     let args: Program = (
-        program.to_program()?,
+        Program::from(program.to_bytes()),
         SerializedProgram::from_bytes(&args.to_vec()).to_program()?,
     )
         .try_into()?;
     let mut alloc = Allocator::new();
     let (cost, result) = CURRY_OBJ_CODE.run_with_cost(&mut alloc, Cost::MAX, args.serialized)?;
     let prog = Node::new(&alloc, result);
-    Ok((
-        cost,
-        SerializedProgram::from_bytes(&node_to_bytes(&prog)?).to_program()?,
-    ))
+    let serialized = SerializedProgram::from_bytes(&node_to_bytes(&prog)?);
+    let program = serialized.to_program()?;
+    Ok((cost, program))
 }
 
 pub fn match_sexp<'a>(

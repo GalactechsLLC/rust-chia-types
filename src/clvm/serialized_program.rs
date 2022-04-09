@@ -8,13 +8,15 @@ use clvmr::cost::Cost;
 use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
 use hex::encode;
-use serde::{Deserialize, Serialize};
+use serde::de::Visitor;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
 use std::error::Error;
+use std::fmt;
 use std::fs;
 use std::path::Path;
 
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Eq, PartialEq, Serialize, Debug)]
 pub struct SerializedProgram {
     buffer: Vec<u8>,
 }
@@ -67,7 +69,7 @@ impl SerializedProgram {
         self.run(allocator, max_cost, 0, args.as_slice())
     }
 
-    pub fn to_program(&self) -> Result<Program, Box<dyn Error>> {
+    pub fn to_program<'a>(self) -> Result<Program, Box<dyn Error>> {
         Ok(Program::new(self.buffer.clone()))
     }
 
@@ -84,6 +86,52 @@ impl SerializedProgram {
         match run_program(allocator, &dialect, program, args, max_cost, None) {
             Ok(reduct) => Ok((reduct.0, reduct.1)),
             Err(error) => Err(error.1.into()),
+        }
+    }
+}
+impl From<String> for SerializedProgram {
+    fn from(hex: String) -> Self {
+        SerializedProgram::from_hex(hex)
+    }
+}
+
+impl From<&str> for SerializedProgram {
+    fn from(hex: &str) -> Self {
+        SerializedProgram::from_hex(hex.to_string())
+    }
+}
+struct SerializedProgramVisitor;
+
+impl<'de> Visitor<'de> for SerializedProgramVisitor {
+    type Value = SerializedProgram;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str(format!("Expecting a hex String, or byte array").as_str())
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(value.into())
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(value.into())
+    }
+}
+
+impl<'a> Deserialize<'a> for SerializedProgram {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        match deserializer.deserialize_string(SerializedProgramVisitor) {
+            Ok(hex) => Ok(hex),
+            Err(er) => Err(er),
         }
     }
 }

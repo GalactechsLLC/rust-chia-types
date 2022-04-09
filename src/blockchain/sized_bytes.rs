@@ -148,7 +148,7 @@ macro_rules! impl_sized_bytes {
                 type Value = $name;
 
                 fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                    formatter.write_str(format!("Expecting a hex String, or byte array of size{}", $size).as_str())
+                    formatter.write_str(format!("Expecting a hex String, or byte array of size {}", $size).as_str())
                 }
 
                 fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
@@ -158,6 +158,12 @@ macro_rules! impl_sized_bytes {
                     Ok(value.into())
                 }
 
+                fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+                where
+                    E: Error,
+                {
+                    Ok(value.into())
+                }
             }
 
             impl<'a> Deserialize<'a> for $name {

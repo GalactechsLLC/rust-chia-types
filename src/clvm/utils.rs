@@ -1,9 +1,9 @@
 use crate::blockchain::sized_bytes::Bytes32;
+use chia::gen::flags::{COND_ARGS_NIL, COND_CANON_INTS, NO_UNKNOWN_CONDS};
 use clvmr::allocator::SExp::Atom;
 use clvmr::allocator::SExp::Pair;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::{NO_NEG_DIV, NO_UNKNOWN_OPS};
-use clvmr::gen::flags::{COND_ARGS_NIL, COND_CANON_INTS, NO_UNKNOWN_CONDS};
 use sha2::{Digest, Sha256, Sha512};
 use std::collections::HashSet;
 use std::error::Error;

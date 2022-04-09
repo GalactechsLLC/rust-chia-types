@@ -40,7 +40,7 @@ pub fn parse_sexp_to_conditions(
     sexp: &SerializedProgram,
 ) -> Result<Vec<ConditionWithArgs>, Box<dyn Error>> {
     let mut results = Vec::new();
-    for mut arg in sexp.to_program() {
+    for mut arg in Program::from(sexp.to_bytes()).iter() {
         match parse_sexp_to_condition(&mut arg) {
             Ok(condition) => {
                 results.push(condition);

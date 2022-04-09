@@ -8,6 +8,7 @@ pub mod coin_record;
 pub mod coin_spend;
 pub mod condition_opcode;
 pub mod condition_with_args;
+pub mod constants;
 pub mod foliage;
 pub mod foliage_block_data;
 pub mod foliage_transaction_block;
