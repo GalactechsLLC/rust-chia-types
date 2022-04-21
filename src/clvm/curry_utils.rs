@@ -1,8 +1,10 @@
 use crate::clvm::program::Program;
 use crate::clvm::serialized_program::SerializedProgram;
 use clvm_rs::allocator::Allocator as Allocator2;
+use clvm_rs::node::Node as Node2;
+use clvm_rs::serialize::node_to_bytes as serialize2;
 use clvm_tools_rs::classic::clvm::__type_compatibility__::{Bytes, BytesFromType};
-use clvm_tools_rs::classic::clvm_tools::cmds::{OpcConversion, TConversion};
+use clvm_tools_rs::classic::clvm_tools::binutils::assemble as chia_assemble;
 use clvmr::allocator::Allocator;
 use clvmr::allocator::NodePtr;
 use clvmr::allocator::SExp;
@@ -14,15 +16,13 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::error::Error;
 
-fn assemble(input_text: &str) -> SerializedProgram {
-    let conv = OpcConversion {};
+pub fn assemble(input_text: &str) -> SerializedProgram {
     let mut allocator = Allocator2::new();
-    let result = conv
-        .invoke(&mut allocator, &input_text.to_string())
-        .map(|r| r.rest().clone())
-        .map_err(|e| e.to_string())
+    let ptr = chia_assemble(&mut allocator, &input_text.to_string()).unwrap();
+    let result = serialize2(&Node2::new(&mut allocator, ptr))
+        .map_err(|e| e.to_string().as_bytes().to_vec())
         .unwrap();
-    SerializedProgram::from_bytes(&result.as_bytes().to_vec())
+    SerializedProgram::from_bytes(&result)
 }
 
 lazy_static! {
@@ -87,21 +87,28 @@ pub fn uncurry(
     }
 }
 
-pub fn curry<'a>(
-    program: &SerializedProgram,
-    args: &[u8],
-) -> Result<(Cost, Program), Box<dyn Error>> {
-    let args: Program = (
-        Program::from(program.to_bytes()),
-        SerializedProgram::from_bytes(&args.to_vec()).to_program()?,
-    )
-        .try_into()?;
+pub fn curry<'a>(program: &Program, args: Vec<Program>) -> Result<(Cost, Program), Box<dyn Error>> {
     let mut alloc = Allocator::new();
-    let (cost, result) = CURRY_OBJ_CODE.run_with_cost(&mut alloc, Cost::MAX, args.serialized)?;
+    let args = make_args(args);
+    let pair: Program = program.cons(&args);
+    let cur_prog = CURRY_OBJ_CODE.clone();
+    let (cost, result) = cur_prog.run_with_cost(&mut alloc, Cost::MAX, &pair)?;
     let prog = Node::new(&alloc, result);
-    let serialized = SerializedProgram::from_bytes(&node_to_bytes(&prog)?);
-    let program = serialized.to_program()?;
-    Ok((cost, program))
+    let bytes = node_to_bytes(&prog)?;
+    Ok((cost, Program::new(bytes)))
+}
+
+fn make_args(args: Vec<Program>) -> Program {
+    if args.len() == 0 {
+        return Program::null();
+    }
+    let mut rtn = args.last().unwrap().cons(&Program::null());
+    let mut rest = args.clone();
+    rest.reverse();
+    for arg in &rest[1..=rest.len() - 1] {
+        rtn = arg.cons(&rtn);
+    }
+    rtn
 }
 
 pub fn match_sexp<'a>(

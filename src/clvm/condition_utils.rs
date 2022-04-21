@@ -3,10 +3,9 @@ use crate::blockchain::coin::Coin;
 use crate::blockchain::condition_opcode::ConditionOpcode;
 use crate::blockchain::condition_with_args::ConditionWithArgs;
 use crate::blockchain::sized_bytes::Bytes32;
-use crate::blockchain::utils::atom_to_uint;
+use crate::blockchain::utils::atom_to_int;
 use crate::clvm::program::Program;
 use crate::clvm::serialized_program::SerializedProgram;
-
 use clvmr::allocator::Allocator;
 use clvmr::node::Node;
 use clvmr::serialize::node_to_bytes;
@@ -15,24 +14,20 @@ use std::collections::HashSet;
 use std::error::Error;
 
 pub fn parse_sexp_to_condition(sexp: &mut Program) -> Result<ConditionWithArgs, Box<dyn Error>> {
-    match sexp.as_atom_list() {
-        Some(as_atoms) => {
-            if as_atoms.len() < 1 {
-                Err("Invalid Condition".into())
-            } else {
-                match as_atoms.split_first() {
-                    Some((first, rest)) => match ConditionOpcode::from_u8(first[0]) {
-                        Ok(opcode) => Ok(ConditionWithArgs {
-                            opcode,
-                            vars: Vec::from(rest),
-                        }),
-                        Err(_error) => Err("Invalid Condition".into()),
-                    },
-                    None => Err("Invalid Condition".into()),
-                }
-            }
+    let as_atoms = sexp.as_atom_list();
+    if as_atoms.len() < 1 {
+        Err("Invalid Condition".into())
+    } else {
+        match as_atoms.split_first() {
+            Some((first, rest)) => match ConditionOpcode::from_u8(first[0]) {
+                Ok(opcode) => Ok(ConditionWithArgs {
+                    opcode,
+                    vars: Vec::from(rest),
+                }),
+                Err(_error) => Err("Invalid Condition".into()),
+            },
+            None => Err("Invalid Condition".into()),
         }
-        None => Err("Invalid Condition".into()),
     }
 }
 
@@ -40,7 +35,8 @@ pub fn parse_sexp_to_conditions(
     sexp: &SerializedProgram,
 ) -> Result<Vec<ConditionWithArgs>, Box<dyn Error>> {
     let mut results = Vec::new();
-    for mut arg in Program::from(sexp.to_bytes()).iter() {
+    let prog = Program::new(sexp.to_bytes());
+    for mut arg in prog.iter() {
         match parse_sexp_to_condition(&mut arg) {
             Ok(condition) => {
                 results.push(condition);
@@ -77,7 +73,7 @@ pub fn created_outputs_for_conditions_dict(
         Some(args) => {
             for cvp in args {
                 let puz_hash = cvp.vars[0].clone();
-                let amount = atom_to_uint(&cvp.vars[1]);
+                let amount = atom_to_int(&cvp.vars[1]).try_into().unwrap();
                 let coin = Coin {
                     parent_coin_info: input_coin_name.clone(),
                     puzzle_hash: puz_hash.into(),
@@ -174,7 +170,8 @@ pub fn conditions_for_solution(
     max_cost: u64,
 ) -> Result<(Vec<ConditionWithArgs>, u64), Box<dyn Error>> {
     let mut allocator = Allocator::new();
-    match puzzle_reveal.run_with_cost(&mut allocator, max_cost, solution.to_bytes()) {
+    match puzzle_reveal.run_with_cost(&mut allocator, max_cost, &Program::new(solution.to_bytes()))
+    {
         Ok((cost, r)) => {
             let node = Node::new(&allocator, r);
             match node_to_bytes(&node) {

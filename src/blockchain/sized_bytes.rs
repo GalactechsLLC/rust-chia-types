@@ -4,6 +4,8 @@ use serde::de::Visitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::error::Error;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 
 pub fn prep_hex_str(to_fix: &String) -> String {
     let lc = to_fix.to_lowercase();
@@ -53,15 +55,17 @@ macro_rules! impl_sized_bytes {
 
     ($($name: ident, $size:expr, $visitor:ident);*) => {
         $(
-            #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+            #[derive(Clone)]
             pub struct $name {
-                bytes: Vec<u8>,
+                pub bytes: Vec<u8>,
+                pub as_str: String
             }
             impl<'a> SizedBytes<'a> for $name {
                 const SIZE: usize = $size;
 
                 fn new(bytes: Vec<u8>) -> Self {
-                    $name { bytes: bytes }
+                    let encoded = (encode(&bytes));
+                    $name { bytes: bytes, as_str: encoded}
                 }
 
                 fn to_bytes(&self) -> Vec<u8> {
@@ -75,6 +79,20 @@ macro_rules! impl_sized_bytes {
                     sized
                 }
             }
+
+            impl PartialEq for $name {
+                fn eq(&self, other: &Self) -> bool {
+                    self.bytes == other.bytes
+                }
+            }
+            impl Eq for $name {}
+
+            impl Hash for $name {
+                fn hash<H: Hasher>(&self, state: &mut H) {
+                    self.bytes.hash(state);
+                }
+            }
+
             impl Serialize for $name {
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where
@@ -83,23 +101,19 @@ macro_rules! impl_sized_bytes {
                     serializer.serialize_str(self.to_string().as_str())
                 }
             }
-            impl fmt::Display for $name {
-                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                    write!(f, "{}", encode(&self.bytes))
-                }
-            }
+
 
             impl From<Vec<u8>> for $name {
                 fn from(bytes: Vec<u8>) -> Self {
                     if 0 != Self::SIZE && bytes.len() > Self::SIZE {
-                        $name { bytes : bytes[..Self::SIZE].to_vec() }
+                        $name::new(bytes[..Self::SIZE].to_vec())
                     } else if 0 != Self::SIZE && bytes.len() < Self::SIZE {
                         let mut m_bytes: Vec<u8> = Vec::new();
                         m_bytes.extend(&bytes);
                         m_bytes.append(&mut b"\x00".repeat(Self::SIZE));
-                        $name { bytes : m_bytes[..Self::SIZE].to_vec() }
+                        $name::new(m_bytes[..Self::SIZE].to_vec())
                     } else {
-                        $name { bytes : bytes }
+                        $name::new(bytes)
                     }
                 }
             }
@@ -114,14 +128,14 @@ macro_rules! impl_sized_bytes {
                 fn from(hex: String) -> Self {
                     let bytes: Vec<u8> = decode(prep_hex_str(&hex)).unwrap();
                     if 0 != Self::SIZE && bytes.len() > Self::SIZE {
-                        $name { bytes : bytes[..Self::SIZE].to_vec() }
+                        $name::new(bytes[..Self::SIZE].to_vec())
                     } else if 0 != Self::SIZE && bytes.len() < Self::SIZE {
                         let mut m_bytes: Vec<u8> = Vec::new();
                         m_bytes.extend(&bytes);
                         m_bytes.append(&mut b"\x00".repeat(Self::SIZE));
-                        $name { bytes : m_bytes[..Self::SIZE].to_vec() }
+                        $name::new(m_bytes[..Self::SIZE].to_vec())
                     } else {
-                        $name { bytes : bytes }
+                        $name::new(bytes)
                     }
                 }
             }
@@ -130,14 +144,14 @@ macro_rules! impl_sized_bytes {
                 fn from(hex: &str) -> Self {
                     let bytes: Vec<u8> = decode(prep_hex_str(&hex.to_string())).unwrap();
                     if 0 != Self::SIZE && bytes.len() > Self::SIZE {
-                        $name { bytes : bytes[..Self::SIZE].to_vec() }
+                        $name::new(bytes[..Self::SIZE].to_vec())
                     } else if 0 != Self::SIZE && bytes.len() < Self::SIZE {
                         let mut m_bytes: Vec<u8> = Vec::new();
                         m_bytes.extend(&bytes);
                         m_bytes.append(&mut b"\x00".repeat(Self::SIZE));
-                        $name { bytes : m_bytes[..Self::SIZE].to_vec() }
+                        $name::new(m_bytes[..Self::SIZE].to_vec())
                     } else {
-                        $name { bytes : bytes }
+                        $name::new(bytes)
                     }
                 }
             }
@@ -177,6 +191,19 @@ macro_rules! impl_sized_bytes {
                     }
                 }
             }
+
+            impl fmt::Display for $name {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "{}", encode(&self.bytes))
+                }
+            }
+
+            impl fmt::Debug for $name {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "{}", encode(&self.bytes))
+                }
+            }
+
         )*
     };
     ()=>{};

@@ -1,6 +1,5 @@
-use crate::blockchain::sized_bytes::{hex_to_bytes, Bytes32};
+use crate::blockchain::sized_bytes::hex_to_bytes;
 use crate::clvm::program::Program;
-use crate::clvm::utils::tree_hash;
 use crate::clvm::utils::MEMPOOL_MODE;
 use clvmr::allocator::{Allocator, NodePtr};
 use clvmr::chia_dialect::ChiaDialect;
@@ -9,14 +8,13 @@ use clvmr::run_program::run_program;
 use clvmr::serialize::node_from_bytes;
 use hex::encode;
 use serde::de::Visitor;
-use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::HashSet;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::Path;
 
-#[derive(Clone, Eq, PartialEq, Serialize, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct SerializedProgram {
     buffer: Vec<u8>,
 }
@@ -43,19 +41,12 @@ impl SerializedProgram {
     pub fn to_bytes(&self) -> Vec<u8> {
         self.buffer.clone()
     }
-    pub fn get_tree_hash(&self, args: &Vec<Bytes32>) -> Result<Bytes32, Box<dyn Error>> {
-        let mut alloc = Allocator::new();
-        match node_from_bytes(&mut alloc, &self.buffer.as_slice()) {
-            Ok(node_ptr) => tree_hash(&alloc, node_ptr, &HashSet::from_iter(args.clone())),
-            Err(error) => Err(Box::new(error)),
-        }
-    }
 
     pub fn run_mempool_with_cost(
         &self,
         allocator: &mut Allocator,
         max_cost: Cost,
-        args: &[u8],
+        args: &Program,
     ) -> Result<(u64, NodePtr), Box<dyn Error>> {
         self.run(allocator, max_cost, MEMPOOL_MODE, args)
     }
@@ -64,9 +55,9 @@ impl SerializedProgram {
         &self,
         allocator: &mut Allocator,
         max_cost: Cost,
-        args: Vec<u8>,
+        args: &Program,
     ) -> Result<(u64, NodePtr), Box<dyn Error>> {
-        self.run(allocator, max_cost, 0, args.as_slice())
+        self.run(allocator, max_cost, 0, args)
     }
 
     pub fn to_program<'a>(self) -> Result<Program, Box<dyn Error>> {
@@ -78,10 +69,10 @@ impl SerializedProgram {
         allocator: &mut Allocator,
         max_cost: Cost,
         flags: u32,
-        args: &[u8],
+        args: &Program,
     ) -> Result<(u64, NodePtr), Box<dyn Error>> {
         let program = node_from_bytes(allocator, &self.buffer.as_slice())?;
-        let args = node_from_bytes(allocator, args)?;
+        let args = node_from_bytes(allocator, args.serialized.as_slice())?;
         let dialect = ChiaDialect::new(flags);
         match run_program(allocator, &dialect, program, args, max_cost, None) {
             Ok(reduct) => Ok((reduct.0, reduct.1)),
@@ -121,6 +112,15 @@ impl<'de> Visitor<'de> for SerializedProgramVisitor {
         E: Error,
     {
         Ok(value.into())
+    }
+}
+
+impl Serialize for SerializedProgram {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.to_string().as_str())
     }
 }
 
