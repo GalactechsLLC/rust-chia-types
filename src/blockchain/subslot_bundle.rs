@@ -4,7 +4,7 @@ use crate::blockchain::reward_chain_subslot::RewardChainSubSlot;
 use crate::blockchain::subslot_proofs::SubSlotProofs;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubSlotBundle {
     pub challenge_chain: ChallengeChainSubSlot,
     pub infused_challenge_chain: Option<InfusedChallengeChainSubSlot>,

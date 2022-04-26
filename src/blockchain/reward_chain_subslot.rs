@@ -2,7 +2,7 @@ use crate::blockchain::sized_bytes::Bytes32;
 use crate::blockchain::vdf_info::VdfInfo;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RewardChainSubSlot {
     pub end_of_slot_vdf: VdfInfo,
     pub challenge_chain_sub_slot_hash: Bytes32,

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::error::Error;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ChallengeChainSubSlot {
     pub challenge_chain_end_of_slot_vdf: VdfInfo,
     pub new_sub_slot_iters: Option<u64>,
