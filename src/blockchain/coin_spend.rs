@@ -1,7 +1,7 @@
 use crate::blockchain::coin::Coin;
 use crate::blockchain::utils::{additions_for_solution, fee_for_solution};
 use crate::clvm::serialized_program::SerializedProgram;
-use crate::clvm::utils::INFINATE_COST;
+use crate::clvm::utils::INFINITE_COST;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 
@@ -17,10 +17,10 @@ impl CoinSpend {
             self.coin.name(),
             &self.puzzle_reveal,
             &self.solution,
-            INFINATE_COST,
+            INFINITE_COST,
         );
     }
     pub fn reserved_fee(self) -> BigInt {
-        return fee_for_solution(&self.puzzle_reveal, &self.solution, INFINATE_COST.into());
+        return fee_for_solution(&self.puzzle_reveal, &self.solution, INFINITE_COST.into());
     }
 }

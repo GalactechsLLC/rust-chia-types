@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 # We need more recent updates clvm_rs = "0.1.17"
-clvmr = "0.1.19"
-chia = {git = "https://github.com/Chia-Network/chia_rs"}
-clvm_tools_rs = {git = "https://github.com/Chia-Network/clvm_tools_rs"}
+clvmr = "0.1.20"
+chia = {git = "https://github.com/Chia-Network/chia_rs", tag = "0.1.4"}
+clvm_tools_rs = {git = "https://github.com/Chia-Network/clvm_tools_rs", tag = "0.1.9"}
 druid_garden_chiapos = { path="../rust-chiapos" }
 hex = "*"
 sha2 = "*"

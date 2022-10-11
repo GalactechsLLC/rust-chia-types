@@ -11,7 +11,7 @@ use std::error::Error;
 pub const MEMPOOL_MODE: u32 =
     NO_NEG_DIV | COND_CANON_INTS | NO_UNKNOWN_CONDS | NO_UNKNOWN_OPS | COND_ARGS_NIL;
 
-pub const INFINATE_COST: u64 = 0x7FFFFFFFFFFFFFFF;
+pub const INFINITE_COST: u64 = 0x7FFFFFFFFFFFFFFF;
 
 pub fn tree_hash(
     alloc: &Allocator,
